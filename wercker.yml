@@ -13,7 +13,7 @@ push-release:
   steps:
     - script:
         name: prepare
-        code: mv time-api /time-api
+        code: mv hello-oow /hello-oow
 
     - internal/docker-push:
         tag: $WERCKER_GIT_BRANCH-$WERCKER_GIT_COMMIT
