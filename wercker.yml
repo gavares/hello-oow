@@ -1,0 +1,66 @@
+box: golang:1.8
+build:
+  base-path: /go/src/github.com/mies/hello-oow
+  steps:
+    - script:
+        name: go test
+        code: go test
+    - script:
+        name: go build
+        code: go build
+
+push-release:
+  steps:
+    - script:
+        name: prepare
+        code: mv time-api /time-api
+
+    - internal/docker-push:
+        tag: $WERCKER_GIT_BRANCH-$WERCKER_GIT_COMMIT
+        ports: "5000"
+        working-dir: /
+        cmd: ./time-api
+        env: "CI=true"
+
+deploy-to-kubernetes:
+    box:
+        id: alpine
+        cmd: /bin/sh
+    steps:
+    - create-file:
+        name: Create Kubernetes CA
+        filename: ca.pem
+        overwrite: true
+        content: $KUBERNETES_CA
+
+    - create-file:
+        name: Create Kubernetes Client Cert
+        filename: cert.pem
+        overwrite: true
+        content: $KUBERNETES_CLIENT_CERT
+
+    - create-file:
+        name: Create Kubernetes Client Key
+        filename: key.pem
+        overwrite: true
+        content: $KUBERNETES_CLIENT_KEY
+
+    - bash-template
+
+    - script:
+        name: Prepare Kubernetes files
+        code: |
+          ls -lth
+          mkdir $WERCKER_OUTPUT_DIR/kubernetes
+          mv kubernetes_*.yml $WERCKER_OUTPUT_DIR/kubernetes
+          ls -lth $WERCKER_OUTPUT_DIR/kubernetes
+          cat $WERCKER_OUTPUT_DIR/kubernetes/kubernetes_service.yml
+          cat $WERCKER_OUTPUT_DIR/kubernetes/kubernetes_deployment.yml
+
+    - kubectl:
+        name: deploy to kubernetes
+        server: $KUBERNETES_MASTER
+        certificate-authority: ca.pem
+        client-certificate: cert.pem
+        client-key: key.pem
+        command: apply -f $WERCKER_OUTPUT_DIR/kubernetes/
